@@ -1,13 +1,13 @@
 #!/bin/sh
 
 # Nginx Proxy Manager Settings
-NPM_HOST_URL='root@10.1.1.251'
+NPM_HOST_URL='root@192.168.1.100'        # Please enter your local IP from NPM here
 # As they set in Docker ENV
 NPM_DATA='/docker/nginx-proxy-manager/data'
 NPM_LE='/docker/nginx-proxy-manager/letsencrypt'
 
 # Target Host
-TARGET_HOST='mail.eg23.ru'
+TARGET_HOST='mail.example.com'            # Please enter your mailcow domain here
 TARGET_CRT_PATH='/opt/mailcow-dockerized/data/assets/ssl/cert.pem'
 TARGET_KEY_PATH='/opt/mailcow-dockerized/data/assets/ssl/key.pem'
 
