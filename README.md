@@ -24,7 +24,7 @@ git clone https://github.com/LazyGatto/npm-cert-export
 cd npm-cert-export
 chmod +x sync_certs.sh
 ```
-2. Edit script
+2. Edit script - sync_certs.sh
 ```sh
 # Nginx Proxy Manager Settings
 
@@ -50,16 +50,30 @@ after_cmd() {
 }
 ```
 
-3. Make sure to add your local user public ssh key from target machine to `authorized_keys` on remote machine, where NPM is running. [Here](https://linuxhandbook.com/add-ssh-public-key-to-server/) is breief instructions how to do this, if you little confused with that.
+3. Edit script - cloudflare_tlsa_mailcow.sh
+```sh
+#!/bin/bash
 
-4. After you run script and check everything is OK, you can add this to crontab
+# 1. Enter your website domain and your Mailcow domain here.
+zone=example.com
+dnsrecord=mail.example.com
+
+# 2. Enter yout Cloudflare-Token here
+cloudflare_token="xxxxxxx"
+...
+```
+
+4. Make sure to add your local user public ssh key from target machine to `authorized_keys` on remote machine, where NPM is running. [Here](https://linuxhandbook.com/add-ssh-public-key-to-server/) is breief instructions how to do this, if you little confused with that.
+
+5. After you run script and check everything is OK, you can add this to crontab
 ```
 crontab -e
 # Add 
 0 * * * * /opt/npm-cert-export/sync_certs.sh > /opt/npm-cert-export/sync_certs.log
+0 * * * * /opt/npm-cert-export/cloudflare_tlsa_mailcow.sh > /opt/npm-cert-export/cloudflare_tlsa_mailcow.sh
 ```
 
-5. Don't forget to disable certificate renew process in mailcow server.
+6. Don't forget to disable certificate renew process in mailcow server.
 ```
 # cat mailcow.conf | grep SKIP_LE
 SKIP_LETS_ENCRYPT=y
