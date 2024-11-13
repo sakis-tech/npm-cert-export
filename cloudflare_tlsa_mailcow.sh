@@ -5,35 +5,40 @@ dnsrecord=mail.example.com    # Please enter your mailcow domain here
 
 ## Cloudflare authentication details
 ## keep these private
-cloudflare_token="xxxxxxx"    # Please enter your created cloudflare token here
+cloudflare_token="xxxxxxxxxxxxxxxxxxx"    # Please enter your created cloudflare token here
 
-# get certificate hash
-chain_hash=$(openssl x509 -in /opt/mailcow-dockerized/data/assets/ssl/cert.pem -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha512 -binary | hexdump -ve '/1 "%02x"')
+# Berechne den SHA-256 Hash des öffentlichen Schlüssels (SubjectPublicKeyInfo)
+chain_hash=$(openssl x509 -in /opt/mailcow-dockerized/data/assets/ssl/cert.pem -pubkey -noout | \
+  openssl pkey -pubin -outform DER | \
+  openssl dgst -sha256 -binary | \
+  xxd -p -c 256)
 
-# get the zone id for the requested zone
+# Der Hash muss genau 64 Zeichen lang sein (256 Bit = 64 Hexadezimalzeichen)
+echo "Calculated public key hash: $chain_hash"
+
+# Hole die Zone-ID von Cloudflare
 zone_id=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$zone&status=active" \
   -H "Authorization: Bearer $cloudflare_token" \
-  -H "Content-Type: application/json" | jq -r '{"result"}[] | .[0] | .id')
+  -H "Content-Type: application/json" | jq -r '.result[0].id')
 
-echo "ID for $zone is $zone_id"
+echo "Zone ID for $zone is $zone_id"
 
 ports=("_25._tcp")
 
 for i in "${ports[@]}"
 do
-    # get the dns record id
+    # Hole die bestehende TLSA DNS-Record-ID
     dnsrecord_req=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=TLSA&name=$i.$dnsrecord" \
         -H "Authorization: Bearer $cloudflare_token" \
         -H "Content-Type: application/json")
     
-    dnsrecord_id=$(echo "$dnsrecord_req" | jq -r '{"result"}[] | .[0] | .id')
-    dnsrecord_hash=$(echo "$dnsrecord_req" | jq -r '{"result"}[] | .[0] | .data.certificate')
+    dnsrecord_id=$(echo "$dnsrecord_req" | jq -r '.result[0].id')
+    dnsrecord_hash=$(echo "$dnsrecord_req" | jq -r '.result[0].data.certificate')
 
     echo "Processing record $i.$dnsrecord ..."
 
-    if [ -z "$dnsrecord_id" ] || [ $dnsrecord_id == "null" ]
-    then
-        # Add the record
+    if [ -z "$dnsrecord_id" ] || [ "$dnsrecord_id" == "null" ]; then
+        # Wenn der TLSA-Record nicht existiert, füge ihn hinzu
         curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records" \
             -H "Authorization: Bearer $cloudflare_token" \
             -H "Content-Type: application/json" \
@@ -41,9 +46,9 @@ do
         
         echo "Record $i.$dnsrecord added!"
     else
-        if [[ "$dnsrecord_hash" != "$chain_hash" ]]
-        then
-            # Update the record
+        # Wenn der Record existiert, überprüfe, ob er aktualisiert werden muss
+        if [[ "$dnsrecord_hash" != "$chain_hash" ]]; then
+            # Wenn der Hash unterschiedlich ist, aktualisiere den Record
             curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$dnsrecord_id" \
                 -H "Authorization: Bearer $cloudflare_token" \
                 -H "Content-Type: application/json" \
